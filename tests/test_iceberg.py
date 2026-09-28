@@ -1,10 +1,10 @@
-from typing import Optional
+from typing import Annotated, Optional
 
 from pydantic import BaseModel
 from pyiceberg.types import BooleanType, DoubleType, IntegerType, LongType, StringType
 
 from pyzigg.exceptions import UnsupportedTypeError
-from pyzigg.iceberg import _int_field_to_iceberg_type, _is_required, _python_type_to_iceberg_type
+from pyzigg.iceberg import _int_field_to_iceberg_type, _is_required, _python_type_to_iceberg_type, to_iceberg_schema
 from pyzigg.types import Int16, Int32, UInt16, UInt32
 
 
@@ -113,3 +113,56 @@ def test_optional_field_with_explicit_none_default_is_not_required():
         value: Optional[int] = None
 
     assert _is_required(Model.model_fields["value"]) is False
+
+
+def test_to_iceberg_schema_end_to_end():
+    class Model(BaseModel):
+        id: Annotated[int, Int32]
+        small: Annotated[int, UInt16]
+        big: Annotated[int, UInt32]
+        plain_count: int
+        name: str
+        score: float
+        is_active: bool
+        nickname: Optional[str] = None
+
+    schema = to_iceberg_schema(Model)
+    fields = list(schema.fields)
+
+    assert [f.name for f in fields] == [
+        "id",
+        "small",
+        "big",
+        "plain_count",
+        "name",
+        "score",
+        "is_active",
+        "nickname",
+    ]
+    assert [f.field_id for f in fields] == [1, 2, 3, 4, 5, 6, 7, 8]
+
+    by_name = {f.name: f for f in fields}
+    assert by_name["id"].field_type == IntegerType()
+    assert by_name["small"].field_type == IntegerType()
+    assert by_name["big"].field_type == LongType()
+    assert by_name["plain_count"].field_type == IntegerType()
+    assert by_name["name"].field_type == StringType()
+    assert by_name["score"].field_type == DoubleType()
+    assert by_name["is_active"].field_type == BooleanType()
+    assert by_name["nickname"].field_type == StringType()
+
+    assert by_name["id"].required is True
+    assert by_name["nickname"].required is False
+
+
+def test_to_iceberg_schema_raises_on_unsupported_field():
+    class Model(BaseModel):
+        items: list[int]
+
+    try:
+        to_iceberg_schema(Model)
+        raised = False
+    except UnsupportedTypeError as exc:
+        raised = True
+        assert exc.field_name == "items"
+    assert raised

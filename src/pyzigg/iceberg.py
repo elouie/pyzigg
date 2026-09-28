@@ -1,7 +1,12 @@
 """Convert annotated pydantic models into Apache Iceberg schemas."""
 
+import types
+import typing
+
+from pydantic import BaseModel
 from pydantic.fields import FieldInfo
-from pyiceberg.types import BooleanType, DoubleType, IcebergType, IntegerType, LongType, StringType
+from pyiceberg.schema import Schema
+from pyiceberg.types import BooleanType, DoubleType, IcebergType, IntegerType, LongType, NestedField, StringType
 
 from pyzigg.exceptions import UnsupportedTypeError
 from pyzigg.types import Int16, Int32, UInt16, UInt32
@@ -51,3 +56,46 @@ def _is_required(field_info: FieldInfo) -> bool:
     required here, matching pydantic's own validation behavior.
     """
     return field_info.is_required()
+
+
+def _unwrap_optional(annotation: type, metadata: tuple[object, ...]) -> tuple[type, tuple[object, ...]]:
+    """Strip an ``Optional[...]`` wrapper (either spelling) down to its inner type + metadata.
+
+    A field declared as ``Optional[Annotated[int, UInt16]]`` keeps the ``Annotated`` wrapper
+    nested inside the ``Optional`` in pydantic's ``FieldInfo.annotation`` rather than having it
+    hoisted into ``FieldInfo.metadata`` (pydantic only does that hoist for a top-level Annotated),
+    so both layers need unwrapping here. A non-Optional Union (more than one non-None arm) is
+    passed through unchanged so the caller reports it as unsupported.
+    """
+    if typing.get_origin(annotation) not in (typing.Union, types.UnionType):
+        return annotation, metadata
+    non_none_args = [arg for arg in typing.get_args(annotation) if arg is not type(None)]
+    if len(non_none_args) != 1:
+        return annotation, metadata
+    inner = non_none_args[0]
+    if typing.get_origin(inner) is typing.Annotated:
+        inner_args = typing.get_args(inner)
+        return inner_args[0], inner_args[1:]
+    return inner, metadata
+
+
+def to_iceberg_schema(model: type[BaseModel]) -> Schema:
+    """Convert a pydantic model class into an Apache Iceberg ``Schema``.
+
+    Fields are assigned sequential Iceberg ``field_id``s (starting at 1) in the model's
+    declaration order. See ``pyzigg.types`` for the int-width marker types, and
+    ``pyzigg.exceptions.UnsupportedTypeError`` for the error raised on unmappable fields.
+    """
+    fields = []
+    for field_id, (name, field_info) in enumerate(model.model_fields.items(), start=1):
+        annotation, metadata = _unwrap_optional(field_info.annotation, tuple(field_info.metadata))
+        iceberg_type = _python_type_to_iceberg_type(name, annotation, metadata)
+        fields.append(
+            NestedField(
+                field_id=field_id,
+                name=name,
+                field_type=iceberg_type,
+                required=_is_required(field_info),
+            )
+        )
+    return Schema(*fields)
