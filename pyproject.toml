@@ -1,0 +1,34 @@
+[project]
+name = "pyzigg"
+version = "0.1.0"
+description = "Annotate pydantic models with explicit data-framework types and translate them to real schemas (Iceberg, with more frameworks planned)."
+readme = "README.md"
+requires-python = ">=3.12"
+license = "MIT"
+authors = [{ name = "Erik Louie", email = "erik@eriklouie.com" }]
+dependencies = ["pydantic>=2", "pyiceberg>=0.12"]
+
+[dependency-groups]
+dev = ["pytest>=8", "ruff>=0.6"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pyzigg"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 120
+indent-width = 4
+target-version = "py312"
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "double"
