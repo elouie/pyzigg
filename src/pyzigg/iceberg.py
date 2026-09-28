@@ -1,7 +1,8 @@
 """Convert annotated pydantic models into Apache Iceberg schemas."""
 
-from pyiceberg.types import IntegerType, LongType
+from pyiceberg.types import BooleanType, DoubleType, IcebergType, IntegerType, LongType, StringType
 
+from pyzigg.exceptions import UnsupportedTypeError
 from pyzigg.types import Int16, Int32, UInt16, UInt32
 
 _INT_MARKER_TO_ICEBERG_TYPE = {
@@ -23,3 +24,19 @@ def _int_field_to_iceberg_type(metadata: tuple[object, ...]) -> IntegerType | Lo
         if marker in _INT_MARKER_TO_ICEBERG_TYPE:
             return _INT_MARKER_TO_ICEBERG_TYPE[marker]
     return IntegerType()
+
+
+_PRIMITIVE_TYPE_TO_ICEBERG_TYPE: dict[type, IcebergType] = {
+    str: StringType(),
+    float: DoubleType(),
+    bool: BooleanType(),
+}
+
+
+def _python_type_to_iceberg_type(field_name: str, annotation: type, metadata: tuple[object, ...]) -> IcebergType:
+    """Map a (non-Optional) field annotation to an Iceberg type, or raise ``UnsupportedTypeError``."""
+    if annotation is int:
+        return _int_field_to_iceberg_type(metadata)
+    if annotation in _PRIMITIVE_TYPE_TO_ICEBERG_TYPE:
+        return _PRIMITIVE_TYPE_TO_ICEBERG_TYPE[annotation]
+    raise UnsupportedTypeError(field_name, annotation)

@@ -1,6 +1,8 @@
-from pyiceberg.types import IntegerType, LongType
+from pydantic import BaseModel
+from pyiceberg.types import BooleanType, DoubleType, IntegerType, LongType, StringType
 
-from pyzigg.iceberg import _int_field_to_iceberg_type
+from pyzigg.exceptions import UnsupportedTypeError
+from pyzigg.iceberg import _int_field_to_iceberg_type, _python_type_to_iceberg_type
 from pyzigg.types import Int16, Int32, UInt16, UInt32
 
 
@@ -22,3 +24,62 @@ def test_uint32_maps_to_long_type():
 
 def test_plain_int_with_no_marker_maps_to_integer_type():
     assert _int_field_to_iceberg_type(()) == IntegerType()
+
+
+def test_str_maps_to_string_type():
+    assert _python_type_to_iceberg_type("f", str, ()) == StringType()
+
+
+def test_float_maps_to_double_type():
+    assert _python_type_to_iceberg_type("f", float, ()) == DoubleType()
+
+
+def test_bool_maps_to_boolean_type():
+    assert _python_type_to_iceberg_type("f", bool, ()) == BooleanType()
+
+
+def test_plain_int_dispatches_through_int_mapping():
+    assert _python_type_to_iceberg_type("f", int, (UInt32,)) == LongType()
+
+
+def test_list_type_is_unsupported():
+    error = None
+    try:
+        _python_type_to_iceberg_type("items", list[int], ())
+    except UnsupportedTypeError as exc:
+        error = exc
+    assert error is not None
+    assert error.field_name == "items"
+
+
+def test_dict_type_is_unsupported():
+    error = None
+    try:
+        _python_type_to_iceberg_type("attrs", dict, ())
+    except UnsupportedTypeError as exc:
+        error = exc
+    assert error is not None
+    assert error.field_name == "attrs"
+
+
+def test_nested_basemodel_is_unsupported():
+    class Nested(BaseModel):
+        x: int
+
+    error = None
+    try:
+        _python_type_to_iceberg_type("nested", Nested, ())
+    except UnsupportedTypeError as exc:
+        error = exc
+    assert error is not None
+    assert error.field_name == "nested"
+
+
+def test_non_optional_union_is_unsupported():
+    error = None
+    try:
+        _python_type_to_iceberg_type("mixed", int | str, ())
+    except UnsupportedTypeError as exc:
+        error = exc
+    assert error is not None
+    assert error.field_name == "mixed"
