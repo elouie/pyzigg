@@ -2,6 +2,7 @@
 
 import types
 import typing
+from typing import Any
 
 from pydantic import BaseModel
 from pydantic.fields import FieldInfo
@@ -11,7 +12,7 @@ from pyiceberg.types import BooleanType, DoubleType, IcebergType, IntegerType, L
 from pyzigg.exceptions import UnsupportedTypeError
 from pyzigg.types import Int16, Int32, UInt16, UInt32
 
-_INT_MARKER_TO_ICEBERG_TYPE = {
+_INT_MARKER_TO_ICEBERG_TYPE: dict[type, IntegerType | LongType] = {
     Int16: IntegerType(),
     UInt16: IntegerType(),
     Int32: IntegerType(),
@@ -39,7 +40,7 @@ _PRIMITIVE_TYPE_TO_ICEBERG_TYPE: dict[type, IcebergType] = {
 }
 
 
-def _python_type_to_iceberg_type(field_name: str, annotation: type, metadata: tuple[object, ...]) -> IcebergType:
+def _python_type_to_iceberg_type(field_name: str, annotation: Any, metadata: tuple[object, ...]) -> IcebergType:
     """Map a (non-Optional) field annotation to an Iceberg type, or raise ``UnsupportedTypeError``."""
     if annotation is int:
         return _int_field_to_iceberg_type(metadata)
@@ -58,7 +59,7 @@ def _is_required(field_info: FieldInfo) -> bool:
     return field_info.is_required()
 
 
-def _unwrap_optional(annotation: type, metadata: tuple[object, ...]) -> tuple[type, tuple[object, ...]]:
+def _unwrap_optional(annotation: Any, metadata: tuple[object, ...]) -> tuple[Any, tuple[object, ...]]:
     """Strip an ``Optional[...]`` wrapper (either spelling) down to its inner type + metadata.
 
     A field declared as ``Optional[Annotated[int, UInt16]]`` keeps the ``Annotated`` wrapper

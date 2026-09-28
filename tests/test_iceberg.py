@@ -125,6 +125,7 @@ def test_to_iceberg_schema_end_to_end():
         score: float
         is_active: bool
         nickname: str | None = None
+        tagged: Annotated[int, UInt32] | None = None
 
     schema = to_iceberg_schema(Model)
     fields = list(schema.fields)
@@ -138,8 +139,9 @@ def test_to_iceberg_schema_end_to_end():
         "score",
         "is_active",
         "nickname",
+        "tagged",
     ]
-    assert [f.field_id for f in fields] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [f.field_id for f in fields] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
     by_name = {f.name: f for f in fields}
     assert by_name["id"].field_type == IntegerType()
@@ -150,9 +152,13 @@ def test_to_iceberg_schema_end_to_end():
     assert by_name["score"].field_type == DoubleType()
     assert by_name["is_active"].field_type == BooleanType()
     assert by_name["nickname"].field_type == StringType()
+    # Annotated marker nested inside Optional needs a second unwrap layer — see
+    # _unwrap_optional's docstring.
+    assert by_name["tagged"].field_type == LongType()
 
     assert by_name["id"].required is True
     assert by_name["nickname"].required is False
+    assert by_name["tagged"].required is False
 
 
 def test_to_iceberg_schema_raises_on_unsupported_field():
