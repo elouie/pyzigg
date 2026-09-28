@@ -1,8 +1,10 @@
+from typing import Optional
+
 from pydantic import BaseModel
 from pyiceberg.types import BooleanType, DoubleType, IntegerType, LongType, StringType
 
 from pyzigg.exceptions import UnsupportedTypeError
-from pyzigg.iceberg import _int_field_to_iceberg_type, _python_type_to_iceberg_type
+from pyzigg.iceberg import _int_field_to_iceberg_type, _is_required, _python_type_to_iceberg_type
 from pyzigg.types import Int16, Int32, UInt16, UInt32
 
 
@@ -83,3 +85,31 @@ def test_non_optional_union_is_unsupported():
         error = exc
     assert error is not None
     assert error.field_name == "mixed"
+
+
+def test_field_with_no_default_is_required():
+    class Model(BaseModel):
+        value: int
+
+    assert _is_required(Model.model_fields["value"]) is True
+
+
+def test_field_with_default_is_not_required():
+    class Model(BaseModel):
+        value: int = 5
+
+    assert _is_required(Model.model_fields["value"]) is False
+
+
+def test_optional_field_with_no_default_is_still_required():
+    class Model(BaseModel):
+        value: Optional[int]
+
+    assert _is_required(Model.model_fields["value"]) is True
+
+
+def test_optional_field_with_explicit_none_default_is_not_required():
+    class Model(BaseModel):
+        value: Optional[int] = None
+
+    assert _is_required(Model.model_fields["value"]) is False

@@ -1,5 +1,6 @@
 """Convert annotated pydantic models into Apache Iceberg schemas."""
 
+from pydantic.fields import FieldInfo
 from pyiceberg.types import BooleanType, DoubleType, IcebergType, IntegerType, LongType, StringType
 
 from pyzigg.exceptions import UnsupportedTypeError
@@ -40,3 +41,13 @@ def _python_type_to_iceberg_type(field_name: str, annotation: type, metadata: tu
     if annotation in _PRIMITIVE_TYPE_TO_ICEBERG_TYPE:
         return _PRIMITIVE_TYPE_TO_ICEBERG_TYPE[annotation]
     raise UnsupportedTypeError(field_name, annotation)
+
+
+def _is_required(field_info: FieldInfo) -> bool:
+    """Mirror pydantic's own notion of required: True unless a default (incl. ``None``) is set.
+
+    Note pydantic v2 does *not* implicitly default a bare ``Optional[T]`` to ``None`` the
+    way pydantic v1 did, so an ``Optional[int]`` field with no explicit default is still
+    required here, matching pydantic's own validation behavior.
+    """
+    return field_info.is_required()
