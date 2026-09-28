@@ -1,4 +1,4 @@
-from typing import Annotated, Optional
+from typing import Annotated
 
 from pydantic import BaseModel
 from pyiceberg.types import BooleanType, DoubleType, IntegerType, LongType, StringType
@@ -103,14 +103,14 @@ def test_field_with_default_is_not_required():
 
 def test_optional_field_with_no_default_is_still_required():
     class Model(BaseModel):
-        value: Optional[int]
+        value: int | None
 
     assert _is_required(Model.model_fields["value"]) is True
 
 
 def test_optional_field_with_explicit_none_default_is_not_required():
     class Model(BaseModel):
-        value: Optional[int] = None
+        value: int | None = None
 
     assert _is_required(Model.model_fields["value"]) is False
 
@@ -124,7 +124,7 @@ def test_to_iceberg_schema_end_to_end():
         name: str
         score: float
         is_active: bool
-        nickname: Optional[str] = None
+        nickname: str | None = None
 
     schema = to_iceberg_schema(Model)
     fields = list(schema.fields)
